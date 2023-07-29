@@ -1,137 +1,88 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { Plugin,Notice } from "obsidian";
 
-// Remember to rename these classes and interfaces!
+export default class CodeTab extends Plugin {
+    async onload() {
+        this.registerMarkdownPostProcessor((element,context) => {
+            const hasTab:boolean = element.getElementsByClassName('language-tab').length !== 0
+            if(!hasTab) return
+            
+            //create basic skeleton of tab-container
+            element.className = 'tab-container'
+			//head
+            const tabHeadersEl = document.createElement('ul')
+            tabHeadersEl.className='tab-headers'
+			//content 
+            const tabContentsEl = document.createElement('div')
+            tabContentsEl.className='tab-contents'
 
-interface MyPluginSettings {
-	mySetting: string;
-}
+            element.appendChild(tabHeadersEl)
+            element.appendChild(tabContentsEl)
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
-}
+            const codeEl = element.querySelector('code')
+            if(codeEl !== null) {
+                const codeElText = codeEl.innerHTML
+				console.log(codeElText)
+                const codeElTextParts = codeElText.split('lang:')
+				console.log(codeElTextParts)
+                for(let i = 1 ; i < codeElTextParts.length; i++) {
+                    // fill up tab-headers
+                    const language = codeElTextParts[i].substring(0,codeElTextParts[i].indexOf('\n'))
+					console.log(language)
+                    
+					const tabHeaderEl = document.createElement('li')
+                    tabHeaderEl.className = 'tab-header'
+                    tabHeaderEl.innerHTML = language
+                    if(i===1) tabHeaderEl.addClass('tab-header--active')
+                    tabHeaderEl.onclick = (e) => handler(e)
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+                    tabHeadersEl.appendChild(tabHeaderEl);
+                    
+                    //fill up tab-contents
+                    const codeText = codeElTextParts[i].substring(codeElTextParts[i].indexOf('\n')+1)
+                    const codeEl = document.createElement('code')
+                    codeEl.className = 'language-'+language
+                    codeEl.innerHTML = codeText
 
-	async onload() {
-		await this.loadSettings();
+                    const copyBtn = document.createElement('button')
+                    copyBtn.className = 'copy-code-button'
+                    copyBtn.innerHTML = 'Copy'
+					copyBtn.onclick = (e) => copyHandler(codeText)
+                    
+					const preEl = document.createElement('pre')
+					preEl.className = 'language-'+language
+                    preEl.appendChild(codeEl)
+                    preEl.appendChild(copyBtn)
+					
+                    const tabContentEl = document.createElement('div')
+					tabContentEl.className = 'tab-content'
+                    if(i===1) tabContentEl.addClass('tab-content--active')
+                    tabContentEl.appendChild(preEl)
 
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
+                    tabContentsEl.appendChild(tabContentEl)
+                }
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
+            }
+            // event handler
+            const handler = (e:MouseEvent) => {
+				const tabHeaderEls = element.getElementsByClassName('tab-header') 
+				const tabContentEls = element.getElementsByClassName('tab-content')
+                for(let i = 0; i < tabHeaderEls.length; i++) {
+                    if(tabHeaderEls[i] === e.srcElement) {
+                        tabHeaderEls[i].classList.add('tab-header--active');
+                        tabContentEls[i].classList.add('tab-content--active');
+                    } else {
+                        tabHeaderEls[i].classList.remove('tab-header--active');
+                        tabContentEls[i].classList.remove('tab-content--active');
+                    }
+                }
+            }
 
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
+			const copyHandler = (text :string) => {
+				navigator.clipboard.writeText(text)
+				new Notice("Copied to your clipboard")
 			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-			}
-		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-	}
-
-	onunload() {
-
-	}
-
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
-}
-
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
-}
-
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
-
-	constructor(app: App, plugin: MyPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
-
-	display(): void {
-		const {containerEl} = this;
-
-		containerEl.empty();
-
-		containerEl.createEl('h2', {text: 'Settings for my awesome plugin.'});
-
-		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					console.log('Secret: ' + value);
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
-	}
+            // remove old codes
+            if(element.firstChild !== null) element.removeChild(element.firstChild)
+        })
+    }
 }
