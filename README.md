@@ -3,7 +3,7 @@
 This is a plugin allows you to insert code blocks in whatever language you want and present them in tab.
 
 # Preview
-[preview](use.gif)
+![preview](use.gif)
 
 # Use
 Insert code block with syntax:
